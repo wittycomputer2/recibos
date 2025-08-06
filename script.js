@@ -218,70 +218,61 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function shiftMonth(entryId, monthOffset) {
-        const entryIndex = entriesData.findIndex(e => e.id === entryId);
-        if (entryIndex === -1) return;
+    const entryIndex = entriesData.findIndex(e => e.id === entryId);
+    if (entryIndex === -1) return;
 
-        const entryData = entriesData[entryIndex];
-        const entryDiv = document.getElementById(entryId);
-        if (!entryDiv) return;
+    const entryData = entriesData[entryIndex];
+    const entryDiv = document.getElementById(entryId);
+    if (!entryDiv) return;
 
-        const periodoFromInput = entryDiv.querySelector('.entry-periodo-from');
-        const periodoToInput = entryDiv.querySelector('.entry-periodo-to');
+    const periodoFromInput = entryDiv.querySelector('.entry-periodo-from');
+    const periodoToInput = entryDiv.querySelector('.entry-periodo-to');
 
+    // Get current "Desde" date
     let currentFromDate;
     if (periodoFromInput.value) {
-        // Ensure date is parsed as local by appending time and using Date constructor
-        currentFromDate = new Date(periodoFromInput.value + 'T00:00:00');
+        const parts = periodoFromInput.value.split('-');
+        currentFromDate = new Date(parts[0], parts[1] - 1, parts[2]);
     } else {
-        // Fallback if date is not set (e.g., new entry before user interaction)
         currentFromDate = new Date();
-        currentFromDate.setHours(0, 0, 0, 0); // Normalize to midnight
-        currentFromDate.setDate(1); // Default to 1st of current month
+        currentFromDate.setHours(0, 0, 0, 0);
+        currentFromDate.setDate(1);
     }
 
-    const originalFromDay = currentFromDate.getDate();
+    // Store the original day
+    const originalDay = currentFromDate.getDate();
 
-    // Calculate new "Desde" date
-    let newFromDate = new Date(currentFromDate.valueOf()); // Clone current date
-    newFromDate.setDate(1); // Set to 1st to avoid month skipping issues when adding/subtracting months
-    newFromDate.setMonth(newFromDate.getMonth() + monthOffset);
+    // Calculate new year and month
+    let newYear = currentFromDate.getFullYear();
+    let newMonth = currentFromDate.getMonth() + monthOffset;
+    
+    // Adjust year if month goes out of bounds
+    newYear += Math.floor(newMonth / 12);
+    newMonth = (newMonth % 12 + 12) % 12; // Ensure positive month (0-11)
 
-    // Get the number of days in the new target month for "Desde"
-    const daysInNewFromMonth = new Date(newFromDate.getFullYear(), newFromDate.getMonth() + 1, 0).getDate();
+    // Create new "Desde" date - this approach avoids Date's month overflow issues
+    let newFromDate = new Date(newYear, newMonth, 1);
+    const daysInNewMonth = new Date(newYear, newMonth + 1, 0).getDate();
+    newFromDate.setDate(Math.min(originalDay, daysInNewMonth));
 
-    // Set the day for newFromDate, capped by the actual number of days in that month
-    newFromDate.setDate(Math.min(originalFromDay, daysInNewFromMonth));
+    // Calculate new "Hasta" date - exactly one month after newFromDate, minus one day
+    let newToDate = new Date(newFromDate);
+    newToDate.setMonth(newToDate.getMonth() + 1);
+    newToDate.setDate(newToDate.getDate() - 1);
 
-    // Calculate new "Hasta" date
-    // Preliminary "Hasta": one day before the "Desde" date would be in the *following* month.
-    let preliminaryHastaDate = new Date(newFromDate.valueOf()); // Clone newFromDate
-    preliminaryHastaDate.setMonth(preliminaryHastaDate.getMonth() + 1); // Advance by one month
-    preliminaryHastaDate.setDate(preliminaryHastaDate.getDate() - 1); // Go back one day
+    // Format dates as YYYY-MM-DD
+    const formatDateForInput = (date) => {
+        const year = date.getFullYear();
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const day = date.getDate().toString().padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
 
-    // Enforce 31-day maximum period (inclusive of start and end day)
-    let newToDate = new Date(preliminaryHastaDate.valueOf()); // Clone
+    // Update DOM and data store
+    periodoFromInput.value = formatDateForInput(newFromDate);
+    periodoToInput.value = formatDateForInput(newToDate);
 
-    // Calculate difference in days (inclusive)
-    // getTime() returns UTC milliseconds. Difference is fine.
-    const timeDiffMs = newToDate.getTime() - newFromDate.getTime();
-    // Rounding handles potential DST shifts if dates were not normalized to midnight, but should be safe here.
-    const diffDaysInclusive = Math.round(timeDiffMs / (1000 * 60 * 60 * 24)) + 1;
-
-    if (diffDaysInclusive > 31) {
-        newToDate = new Date(newFromDate.valueOf()); // Clone newFromDate
-        newToDate.setDate(newFromDate.getDate() + 30); // Add 30 days to get a 31-day period
-    }
-
-    // Final safety check: ensure newToDate is not before newFromDate
-    if (newToDate < newFromDate) {
-        newToDate = new Date(newFromDate.valueOf()); // Set to be same as newFromDate if it somehow ended up earlier
-    }
-
-    // Update DOM and data store using YYYY-MM-DD format
-    periodoFromInput.value = newFromDate.toISOString().split('T')[0];
-    periodoToInput.value = newToDate.toISOString().split('T')[0];
-
-    // Update display spans after shiftMonth
+    // Update display spans
     const fromDisplaySpan = entryDiv.querySelector('.from-display-span');
     const toDisplaySpan = entryDiv.querySelector('.to-display-span');
     if (fromDisplaySpan) fromDisplaySpan.textContent = formatDateForDisplay(periodoFromInput.value);
@@ -291,7 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
     entryData.periodoTo = periodoToInput.value;
 
     saveEntries();
-    }
+}
 
     // Enhanced function to generate receipt number
     function generateReceiptNumber() {
