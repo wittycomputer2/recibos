@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Recibos</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Generador de Recibos</h1>
+
+        <div id="entries-container">
+            <!-- Entry template (will be cloned by JavaScript) -->
+            <div class="entry" style="display: none;" id="entry-template">
+                <input type="text" class="entry-depto" placeholder="Depto (Opcional)">
+                <input type="text" class="entry-inquilino" placeholder="Inquilino">
+                <input type="number" class="entry-monto" placeholder="Monto de la Renta">
+                <div class="periodo-container">
+                    <div class="date-field-group">
+                        <label>Desde:</label>
+                        <input type="date" class="entry-periodo-from">
+                        <span class="date-display-span from-display-span"></span>
+                    </div>
+                    <div class="date-field-group">
+                        <label>Hasta:</label> <!-- Removed inline style="margin-left: 10px;" as spacing will be handled by .periodo-container's gap -->
+                        <input type="date" class="entry-periodo-to">
+                        <span class="date-display-span to-display-span"></span>
+                    </div>
+                </div>
+                <button class="prev-month-btn">Mes Previo</button>
+                <button class="next-month-btn">Próximo Mes</button>
+                <button class="remove-entry-btn">Eliminar</button>
+            </div>
+        </div>
+
+        <button id="add-entry-btn">Agregar Nueva Entrada</button>
+        <button id="print-receipts-btn">Imprimir Recibos</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
