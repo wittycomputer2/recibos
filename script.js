@@ -406,7 +406,7 @@ document.addEventListener('DOMContentLoaded', () => {
         doc.setTextColor(25, 25, 112);
         doc.setFont("helvetica", "bold");
         doc.setFontSize(18);
-        doc.text('RECIBO DE PAGO', pageWidth / 2, contentY, { align: 'center' });
+        doc.text('RECIBO OFICIAL DE PAGO', pageWidth / 2, contentY, { align: 'center' });
 
         // Receipt number
         doc.setFontSize(10);
@@ -415,13 +415,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         contentY += 18;
 
-        // Separator
-        doc.setDrawColor(70, 130, 180);
-        doc.setLineWidth(0.5);
-        doc.line(margin + 8, contentY, margin + receiptWidth - 8, contentY);
-        contentY += 6;
-
-        // Date + Tenant
+        // Fecha + Recibí de
         doc.setTextColor(51, 51, 51);
         doc.setFont("times", "bold");
         doc.setFontSize(11);
@@ -435,9 +429,16 @@ document.addEventListener('DOMContentLoaded', () => {
         doc.setFontSize(12);
         doc.text(`${entry.inquilino || 'N/A'}`, margin + receiptWidth / 2 + 25, contentY);
 
-        contentY += 10;
+        contentY += 6;
 
-        // Amount + Words
+        // === Top separator line (NOW moved BELOW header info) ===
+        doc.setDrawColor(70, 130, 180);
+        doc.setLineWidth(0.5);
+        doc.line(margin + 8, contentY, margin + receiptWidth - 8, contentY);
+
+        contentY += 6;
+
+        // Amount
         const amount = parseFloat(entry.monto || 0);
         const amountStr = `$ ${amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN`;
         const amountInWords = numberToWords(Math.floor(amount));
@@ -463,21 +464,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
         contentY += 14;
 
-        // Concept with dates
-        doc.setTextColor(51, 51, 51);
+        // Concept line (wrapped as requested)
         doc.setFont("times", "bold");
         doc.setFontSize(11);
+        doc.setTextColor(51, 51, 51);
+        doc.text('Por concepto de', margin + 8, contentY);
+        contentY += 6;
+
         const desde = formatDate(entry.periodoFrom);
         const hasta = formatDate(entry.periodoTo);
-        doc.text(`Por concepto de renta desde ${desde} hasta ${hasta}`, margin + 8, contentY);
+        doc.text(`renta desde ${desde} hasta ${hasta}`, margin + 8, contentY);
 
-        contentY += 16;
+        contentY += 18;
 
-        // Signature
+        // Signature line
         doc.setFont("times", "bold");
         doc.setFontSize(10);
         doc.setTextColor(51, 51, 51);
         doc.text('Firma:', margin + receiptWidth - 80, receiptBottom - 14);
+
         doc.setDrawColor(150, 150, 150);
         doc.setLineWidth(0.8);
         doc.line(margin + receiptWidth - 65, receiptBottom - 11, margin + receiptWidth - 8, receiptBottom - 11);
@@ -488,6 +493,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     doc.save('recibos_oficiales_alquiler.pdf');
 }
+
 
 
 
