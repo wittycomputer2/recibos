@@ -228,16 +228,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const periodoFromInput = entryDiv.querySelector('.entry-periodo-from');
         const periodoToInput = entryDiv.querySelector('.entry-periodo-to');
 
-        // Helper function to add months and handle day adjustments
         const addMonths = (date, months) => {
-            const d = new Date(date);
-            const originalDay = d.getDate();
-            d.setMonth(d.getMonth() + months);
-            // If the new month has fewer days, adjust to the last day of the new month
-            if (d.getDate() !== originalDay) {
-                d.setDate(0);
-            }
-            return d;
+            const newDate = new Date(date);
+            const originalDay = newDate.getDate();
+            newDate.setDate(1); // Set to the 1st day of the month to avoid issues with setMonth
+            newDate.setMonth(newDate.getMonth() + months);
+            const lastDayOfNewMonth = new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0).getDate();
+            newDate.setDate(Math.min(originalDay, lastDayOfNewMonth));
+            return newDate;
         };
 
         let currentFromDate;
@@ -259,11 +257,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const newFromDate = addMonths(currentFromDate, monthOffset);
         const newToDate = addMonths(currentToDate, monthOffset);
 
-        // Update DOM and data store using YYYY-MM-DD format
         periodoFromInput.value = newFromDate.toISOString().split('T')[0];
         periodoToInput.value = newToDate.toISOString().split('T')[0];
 
-        // Update display spans after shiftMonth
         const fromDisplaySpan = entryDiv.querySelector('.from-display-span');
         const toDisplaySpan = entryDiv.querySelector('.to-display-span');
         if (fromDisplaySpan) fromDisplaySpan.textContent = formatDateForDisplay(periodoFromInput.value);
