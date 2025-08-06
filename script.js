@@ -228,69 +228,51 @@ document.addEventListener('DOMContentLoaded', () => {
         const periodoFromInput = entryDiv.querySelector('.entry-periodo-from');
         const periodoToInput = entryDiv.querySelector('.entry-periodo-to');
 
-    let currentFromDate;
-    if (periodoFromInput.value) {
-        // Ensure date is parsed as local by appending time and using Date constructor
-        currentFromDate = new Date(periodoFromInput.value + 'T00:00:00');
-    } else {
-        // Fallback if date is not set (e.g., new entry before user interaction)
-        currentFromDate = new Date();
-        currentFromDate.setHours(0, 0, 0, 0); // Normalize to midnight
-        currentFromDate.setDate(1); // Default to 1st of current month
-    }
+        // Helper function to add months and handle day adjustments
+        const addMonths = (date, months) => {
+            const d = new Date(date);
+            const originalDay = d.getDate();
+            d.setMonth(d.getMonth() + months);
+            // If the new month has fewer days, adjust to the last day of the new month
+            if (d.getDate() !== originalDay) {
+                d.setDate(0);
+            }
+            return d;
+        };
 
-    const originalFromDay = currentFromDate.getDate();
+        let currentFromDate;
+        if (periodoFromInput.value) {
+            currentFromDate = new Date(periodoFromInput.value + 'T00:00:00');
+        } else {
+            currentFromDate = new Date();
+            currentFromDate.setHours(0, 0, 0, 0);
+        }
 
-    // Calculate new "Desde" date
-    let newFromDate = new Date(currentFromDate.valueOf()); // Clone current date
-    newFromDate.setDate(1); // Set to 1st to avoid month skipping issues when adding/subtracting months
-    newFromDate.setMonth(newFromDate.getMonth() + monthOffset);
+        let currentToDate;
+        if (periodoToInput.value) {
+            currentToDate = new Date(periodoToInput.value + 'T00:00:00');
+        } else {
+            currentToDate = new Date();
+            currentToDate.setHours(0, 0, 0, 0);
+        }
 
-    // Get the number of days in the new target month for "Desde"
-    const daysInNewFromMonth = new Date(newFromDate.getFullYear(), newFromDate.getMonth() + 1, 0).getDate();
+        const newFromDate = addMonths(currentFromDate, monthOffset);
+        const newToDate = addMonths(currentToDate, monthOffset);
 
-    // Set the day for newFromDate, capped by the actual number of days in that month
-    newFromDate.setDate(Math.min(originalFromDay, daysInNewFromMonth));
+        // Update DOM and data store using YYYY-MM-DD format
+        periodoFromInput.value = newFromDate.toISOString().split('T')[0];
+        periodoToInput.value = newToDate.toISOString().split('T')[0];
 
-    // Calculate new "Hasta" date
-    // Preliminary "Hasta": one day before the "Desde" date would be in the *following* month.
-    let preliminaryHastaDate = new Date(newFromDate.valueOf()); // Clone newFromDate
-    preliminaryHastaDate.setMonth(preliminaryHastaDate.getMonth() + 1); // Advance by one month
-    preliminaryHastaDate.setDate(preliminaryHastaDate.getDate() - 1); // Go back one day
+        // Update display spans after shiftMonth
+        const fromDisplaySpan = entryDiv.querySelector('.from-display-span');
+        const toDisplaySpan = entryDiv.querySelector('.to-display-span');
+        if (fromDisplaySpan) fromDisplaySpan.textContent = formatDateForDisplay(periodoFromInput.value);
+        if (toDisplaySpan) toDisplaySpan.textContent = formatDateForDisplay(periodoToInput.value);
 
-    // Enforce 31-day maximum period (inclusive of start and end day)
-    let newToDate = new Date(preliminaryHastaDate.valueOf()); // Clone
+        entryData.periodoFrom = periodoFromInput.value;
+        entryData.periodoTo = periodoToInput.value;
 
-    // Calculate difference in days (inclusive)
-    // getTime() returns UTC milliseconds. Difference is fine.
-    const timeDiffMs = newToDate.getTime() - newFromDate.getTime();
-    // Rounding handles potential DST shifts if dates were not normalized to midnight, but should be safe here.
-    const diffDaysInclusive = Math.round(timeDiffMs / (1000 * 60 * 60 * 24)) + 1;
-
-    if (diffDaysInclusive > 31) {
-        newToDate = new Date(newFromDate.valueOf()); // Clone newFromDate
-        newToDate.setDate(newFromDate.getDate() + 30); // Add 30 days to get a 31-day period
-    }
-
-    // Final safety check: ensure newToDate is not before newFromDate
-    if (newToDate < newFromDate) {
-        newToDate = new Date(newFromDate.valueOf()); // Set to be same as newFromDate if it somehow ended up earlier
-    }
-
-    // Update DOM and data store using YYYY-MM-DD format
-    periodoFromInput.value = newFromDate.toISOString().split('T')[0];
-    periodoToInput.value = newToDate.toISOString().split('T')[0];
-
-    // Update display spans after shiftMonth
-    const fromDisplaySpan = entryDiv.querySelector('.from-display-span');
-    const toDisplaySpan = entryDiv.querySelector('.to-display-span');
-    if (fromDisplaySpan) fromDisplaySpan.textContent = formatDateForDisplay(periodoFromInput.value);
-    if (toDisplaySpan) toDisplaySpan.textContent = formatDateForDisplay(periodoToInput.value);
-
-    entryData.periodoFrom = periodoFromInput.value;
-    entryData.periodoTo = periodoToInput.value;
-
-    saveEntries();
+        saveEntries();
     }
 
     function printReceipts() {
