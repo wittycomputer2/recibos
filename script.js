@@ -406,7 +406,7 @@ document.addEventListener('DOMContentLoaded', () => {
         doc.setTextColor(25, 25, 112);
         doc.setFont("helvetica", "bold");
         doc.setFontSize(18);
-        doc.text('RECIBO OFICIAL DE PAGO', pageWidth / 2, contentY, { align: 'center' });
+        doc.text('RECIBO DE PAGO', pageWidth / 2, contentY, { align: 'center' });
 
         // Receipt number
         doc.setFontSize(10);
