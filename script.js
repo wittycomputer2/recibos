@@ -293,96 +293,204 @@ document.addEventListener('DOMContentLoaded', () => {
     saveEntries();
     }
 
-    function printReceipts() {
-        const validEntries = entriesData.filter(e => e.inquilino && e.monto && e.periodoFrom && e.periodoTo);
+    // Enhanced function to generate receipt number
+    function generateReceiptNumber() {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = (today.getMonth() + 1).toString().padStart(2, '0');
+        const day = today.getDate().toString().padStart(2, '0');
+        const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+        return `${year}${month}${day}-${random}`;
+    }
 
-        if (validEntries.length === 0) {
-            alert('No hay entradas válidas para imprimir. Asegúrese de que Inquilino, Monto y Períodos estén completos.');
-            return;
+    // Function to convert number to words in Spanish
+    function numberToWords(num) {
+        const ones = ['', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve'];
+        const teens = ['diez', 'once', 'doce', 'trece', 'catorce', 'quince', 'dieciséis', 'diecisiete', 'dieciocho', 'diecinueve'];
+        const tens = ['', '', 'veinte', 'treinta', 'cuarenta', 'cincuenta', 'sesenta', 'setenta', 'ochenta', 'noventa'];
+        const hundreds = ['', 'ciento', 'doscientos', 'trescientos', 'cuatrocientos', 'quinientos', 'seiscientos', 'setecientos', 'ochocientos', 'novecientos'];
+
+        if (num === 0) return 'cero';
+        if (num === 100) return 'cien';
+        if (num === 1000) return 'mil';
+
+        let result = '';
+        
+        // Handle thousands
+        if (num >= 1000) {
+            const thousands = Math.floor(num / 1000);
+            if (thousands === 1) {
+                result += 'mil ';
+            } else {
+                result += numberToWords(thousands) + ' mil ';
+            }
+            num %= 1000;
         }
 
-        const doc = new jsPDF({ unit: 'mm', format: 'letter' });
-        doc.setFont("Helvetica", "normal");
-        const pageHeight = doc.internal.pageSize.height;
-        const pageWidth = doc.internal.pageSize.width;
-        const margin = 10; // mm
-        const receiptWidth = (pageWidth - (margin * 3)) / 2; // 2 columns, 3 margins (left, middle, right)
-        const receiptHeight = (pageHeight - (margin * 4)) / 3; // 3 rows, 4 margins (top, between, between, bottom)
-        let x = margin;
-        let y = margin;
-        let entriesOnPage = 0;
+        // Handle hundreds
+        if (num >= 100) {
+            result += hundreds[Math.floor(num / 100)] + ' ';
+            num %= 100;
+        }
 
-        validEntries.forEach((entry, index) => {
-            if (entriesOnPage > 0 && entriesOnPage % 6 === 0) {
-                doc.addPage();
-                x = margin;
-                y = margin;
-                entriesOnPage = 0;
+        // Handle tens and ones
+        if (num >= 20) {
+            result += tens[Math.floor(num / 10)];
+            if (num % 10 !== 0) {
+                result += ' y ' + ones[num % 10];
             }
+        } else if (num >= 10) {
+            result += teens[num - 10];
+        } else if (num > 0) {
+            result += ones[num];
+        }
 
-            const currentX = x + ( (entriesOnPage % 2) * (receiptWidth + margin) );
-            const currentY = y + ( Math.floor(entriesOnPage / 2) * (receiptHeight + margin) );
+        return result.trim();
+    }
 
-            // Draw border for receipt (optional)
-            doc.rect(currentX, currentY, receiptWidth, receiptHeight);
+    function printReceipts() {
+    const validEntries = entriesData.filter(e => e.inquilino && e.monto && e.periodoFrom && e.periodoTo);
 
-            // let textY = currentY + 10; // Start text a bit inside the receipt box - Replaced by contentTextY logic
-            const textX = currentX + 5;
-            const textMaxWidth = receiptWidth - 10;
+    if (validEntries.length === 0) {
+        alert('No hay entradas válidas para imprimir. Asegúrese de que Inquilino, Monto y Períodos estén completos.');
+        return;
+    }
 
-            // Re-calculate textY starting position for content
-            let contentTextY = currentY + 10; // Initial top padding for text inside receipt box
+    const doc = new jsPDF({ unit: 'mm', format: 'letter' });
+    const pageHeight = doc.internal.pageSize.height;
+    const pageWidth = doc.internal.pageSize.width;
+    const margin = 12;
+    const receiptWidth = pageWidth - (margin * 2);
+    const receiptHeight = 90;
+    let currentY = margin;
+    let receiptsOnPage = 0;
 
-            doc.setFontSize(10); // Title font size
-            doc.text(`RECIBO DE DINERO`, currentX + receiptWidth / 2, contentTextY, { align: 'center' });
-            contentTextY += 3.5; // Approximate height of 10pt font
-            contentTextY += 7;  // Gap after title
+    validEntries.forEach((entry, index) => {
+        if (receiptsOnPage > 0 && currentY + receiptHeight > pageHeight - margin) {
+            doc.addPage();
+            currentY = margin;
+            receiptsOnPage = 0;
+        }
 
-            doc.setFontSize(9); // New font size for main content
-
-            doc.text(`Recibí de: ${entry.inquilino || 'N/A'}`, textX, contentTextY, { maxWidth: textMaxWidth });
-            contentTextY += 3.2; // Approximate height of 9pt font
-            contentTextY += 7;  // Gap
-
-            doc.text(`La cantidad de: $${parseFloat(entry.monto || 0).toLocaleString('en-US')} pesos`, textX, contentTextY, { maxWidth: textMaxWidth });
-            contentTextY += 3.2;
-            contentTextY += 7;  // Gap
-
-            doc.text(`Del período:`, textX, contentTextY);
-            contentTextY += 3.2;
-            contentTextY += 5;  // Smaller gap
-
-            doc.text(`  Desde: ${formatDate(entry.periodoFrom)}`, textX + 2, contentTextY, { maxWidth: textMaxWidth - 2 });
-            contentTextY += 3.2;
-            contentTextY += 5;  // Smaller gap
-
-            doc.text(`  Hasta: ${formatDate(entry.periodoTo)}`, textX + 2, contentTextY, { maxWidth: textMaxWidth - 2 });
-            contentTextY += 3.2;
-            // End of main content lines. contentTextY is now at the baseline of where the NEXT line would start.
-
-            // Position "Firma:" line
-            // Target Y for drawing Firma line: bottom of receipt box - a margin - height of "Firma:" text.
-            const firmaLineHeight = 3.2; // Approx height of 9pt font
-            const bottomReceiptMargin = 5; // Desired margin at the very bottom of the receipt box
-            let firmaTextY = currentY + receiptHeight - bottomReceiptMargin - firmaLineHeight;
-
-            // Ensure there's a minimum space between last content line and Firma line.
-            const minSignatureGap = 10; // Minimum desired visual gap above the Firma line.
-            if (firmaTextY < contentTextY + minSignatureGap) {
-                // This case means content is pushing too far down or signature line is too high.
-                // If firmaTextY is still too high (e.g. contentTextY is very large), we can adjust firmaTextY down,
-                // but it might go off-page or overlap border if receiptHeight is small.
-                // For now, we accept the calculated firmaTextY. If it's above content + gap, it's fine.
-                // If it's below, it means content is dense, which is also fine for this step.
-            }
-
-            doc.text(`Firma: ____________________`, textX, firmaTextY, { maxWidth: textMaxWidth });
-
-            entriesOnPage++;
+        const receiptNumber = generateReceiptNumber();
+        const currentDate = new Date().toLocaleDateString('es-ES', {
+            day: '2-digit',
+            month: 'long',
+            year: 'numeric'
         });
 
-        doc.save('recibos_alquiler.pdf');
-    }
+        const receiptTop = currentY;
+        const receiptBottom = currentY + receiptHeight;
+
+        // === Main Border ===
+        doc.setDrawColor(51, 51, 51);
+        doc.setLineWidth(1.2);
+        doc.rect(margin, receiptTop, receiptWidth, receiptHeight);
+
+        // === Decorative Header Strip ===
+        doc.setFillColor(240, 248, 255);
+        doc.setDrawColor(240, 248, 255);
+        doc.rect(margin, receiptTop, receiptWidth, 20, 'F');
+
+        // === Decorative Corners ===
+        doc.setFillColor(70, 130, 180);
+        doc.circle(margin + 5, receiptTop + 5, 2, 'F');
+        doc.circle(margin + receiptWidth - 5, receiptTop + 5, 2, 'F');
+        doc.circle(margin + 5, receiptBottom - 5, 2, 'F');
+        doc.circle(margin + receiptWidth - 5, receiptBottom - 5, 2, 'F');
+
+        // === Content Layout ===
+        let contentY = receiptTop + 8;
+
+        // Title
+        doc.setTextColor(25, 25, 112);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(18);
+        doc.text('RECIBO DE PAGO', pageWidth / 2, contentY, { align: 'center' });
+
+        // Receipt number
+        doc.setFontSize(10);
+        doc.setTextColor(100, 100, 100);
+        doc.text(`No. ${receiptNumber}`, margin + receiptWidth - 5, contentY + 5, { align: 'right' });
+
+        contentY += 18;
+
+        // Separator
+        doc.setDrawColor(70, 130, 180);
+        doc.setLineWidth(0.5);
+        doc.line(margin + 8, contentY, margin + receiptWidth - 8, contentY);
+        contentY += 6;
+
+        // Date + Tenant
+        doc.setTextColor(51, 51, 51);
+        doc.setFont("times", "bold");
+        doc.setFontSize(11);
+        doc.text('Fecha:', margin + 8, contentY);
+        doc.setFont("times", "normal");
+        doc.text(currentDate, margin + 25, contentY);
+
+        doc.setFont("times", "bold");
+        doc.text('Recibí de:', margin + receiptWidth / 2, contentY);
+        doc.setFont("times", "normal");
+        doc.setFontSize(12);
+        doc.text(`${entry.inquilino || 'N/A'}`, margin + receiptWidth / 2 + 25, contentY);
+
+        contentY += 10;
+
+        // Amount + Words
+        const amount = parseFloat(entry.monto || 0);
+        const amountStr = `$ ${amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN`;
+        const amountInWords = numberToWords(Math.floor(amount));
+        const cents = amount % 1 !== 0 ? Math.round((amount % 1) * 100).toString().padStart(2, '0') : '00';
+        const amountWordsStr = `(${amountInWords} pesos ${cents}/100 M.N.)`;
+
+        doc.setFont("times", "bold");
+        doc.setFontSize(11);
+        doc.setTextColor(51, 51, 51);
+        doc.text('La cantidad de:', margin + 8, contentY);
+
+        doc.setFont("times", "bold");
+        doc.setFontSize(14);
+        doc.setTextColor(25, 25, 112);
+        doc.text(amountStr, margin + 45, contentY);
+
+        contentY += 6;
+
+        doc.setFont("times", "italic");
+        doc.setFontSize(9);
+        doc.setTextColor(100, 100, 100);
+        doc.text(amountWordsStr, margin + 8, contentY, { maxWidth: receiptWidth - 16 });
+
+        contentY += 14;
+
+        // Concept with dates
+        doc.setTextColor(51, 51, 51);
+        doc.setFont("times", "bold");
+        doc.setFontSize(11);
+        const desde = formatDate(entry.periodoFrom);
+        const hasta = formatDate(entry.periodoTo);
+        doc.text(`Por concepto de renta desde ${desde} hasta ${hasta}`, margin + 8, contentY);
+
+        contentY += 16;
+
+        // Signature
+        doc.setFont("times", "bold");
+        doc.setFontSize(10);
+        doc.setTextColor(51, 51, 51);
+        doc.text('Firma:', margin + receiptWidth - 80, receiptBottom - 14);
+        doc.setDrawColor(150, 150, 150);
+        doc.setLineWidth(0.8);
+        doc.line(margin + receiptWidth - 65, receiptBottom - 11, margin + receiptWidth - 8, receiptBottom - 11);
+
+        currentY += receiptHeight + 8;
+        receiptsOnPage++;
+    });
+
+    doc.save('recibos_oficiales_alquiler.pdf');
+}
+
+
+
 
     addEntryBtn.addEventListener('click', () => addEntry()); // Pass no data for new blank entry
     printReceiptsBtn.addEventListener('click', printReceipts);
