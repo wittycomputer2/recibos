@@ -34,6 +34,10 @@ h1 {
     gap: 10px; /* Spacing between elements within an entry */
 }
 
+.entry.entry-has-warning {
+    border-color: #ffc107;
+}
+
 .entry input[type="text"],
 .entry input[type="number"],
 .entry input[type="date"] {
@@ -51,57 +55,55 @@ h1 {
     /* General styles for date inputs in entries, will be overridden by more specific below */
 }
 
+.global-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 8px 0 50px;
+}
+
 /* Styles for the custom date display */
 .periodo-container {
     position: relative;
     display: flex;
     align-items: center;
-    gap: 15px; /* Gap between 'Desde group' and 'Hasta group' */
-    /* flex-wrap: wrap; */ /* Add if they should wrap on smaller screens */
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 4px;
 }
 
-.date-field-group {
+.receipt-period-summary {
     display: flex;
     align-items: center;
-    gap: 5px; /* Gap between label, icon, and span within the group */
-    flex-grow: 1; /* Each group will take up equal space */
-    flex-basis: 0; /* Distribute space evenly */
+    gap: 8px;
+    flex: 1 1 420px;
+    flex-wrap: wrap;
 }
 
-.date-field-group label {
-    order: 1;
+.period-label,
+.period-separator {
     flex-shrink: 0;
     color: #ccc;
-    margin-bottom: 0;
-    /* margin-right: 5px; was removed, relying on gap now */
+    font-weight: 600;
 }
 
-.date-field-group input[type="date"] {
-    order: 2;
-    background-color: transparent;
-    border: none;
-    padding: 0;
-    width: auto;
-    min-width: auto;
-    flex-grow: 0;
-    color: transparent;
-    margin-left: 0;
-    cursor: pointer;
-    /* Ensure color-scheme: dark is inherited or re-applied if needed */
-    color-scheme: dark; /* Re-apply for specificity */
+.receipt-date-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
 }
 
-.date-field-group .date-display-span { /* Scoped to .date-field-group */
-    order: 3;
+.receipt-period-summary .date-display-span {
     display: inline-block;
     padding: 10px;
     background-color: #333;
     color: #fff;
     border: 1px solid #666;
     border-radius: 4px;
-    min-width: 100px;
-    text-align: left;
-    flex-grow: 1; /* Span will take remaining space within its group */
+    min-width: 112px;
+    text-align: center;
     font-size: 1em;
     line-height: normal;
     cursor: default;
@@ -109,7 +111,7 @@ h1 {
 
 /* Styling for the calendar picker indicator for Webkit browsers */
 /* Keep this selector specific to input[type=date] within the group */
-.date-field-group input[type="date"]::-webkit-calendar-picker-indicator {
+.receipt-date-input::-webkit-calendar-picker-indicator {
     filter: invert(1) grayscale(1) brightness(1.5);
     padding: 5px;
     margin: 0;
@@ -117,7 +119,10 @@ h1 {
 }
 
 .entry button,
+#add-entry-top-btn,
 #add-entry-btn,
+#prev-all-month-btn,
+#next-all-month-btn,
 #print-receipts-btn {
     padding: 10px 15px;
     color: #fff;
@@ -128,11 +133,25 @@ h1 {
     transition: background-color 0.3s ease;
 }
 
-.entry .prev-month-btn, .entry .next-month-btn {
+.entry .prev-month-btn,
+.entry .next-month-btn,
+.entry .edit-date-btn {
     background-color: #007bff; /* Blue for date navigation */
 }
-.entry .prev-month-btn:hover, .entry .next-month-btn:hover {
+.entry .prev-month-btn:hover,
+.entry .next-month-btn:hover,
+.entry .edit-date-btn:hover {
     background-color: #0056b3;
+}
+
+.entry-warning {
+    display: none;
+    background-color: #3d3208;
+    border: 1px solid #ffc107;
+    border-radius: 4px;
+    color: #ffe8a1;
+    font-weight: 600;
+    padding: 8px 10px;
 }
 
 .entry .remove-entry-btn {
@@ -142,12 +161,22 @@ h1 {
     background-color: #c82333;
 }
 
+#add-entry-top-btn,
 #add-entry-btn {
     background-color: #28a745; /* Green for add */
     margin-right: 10px; /* Space between global buttons */
 }
+#add-entry-top-btn:hover,
 #add-entry-btn:hover {
     background-color: #218838;
+}
+
+.global-month-btn {
+    background-color: #007bff;
+}
+
+.global-month-btn:hover {
+    background-color: #0056b3;
 }
 
 #print-receipts-btn {
@@ -178,6 +207,238 @@ input::placeholder {
     margin-top: 5px;
 }
 
+.entry .prev-month-btn {
+    margin-top: 8px;
+}
+
 /* If using the specific classes for targeting from/to spans for different styling (not used here yet) */
 /* .from-display-span { } */
 /* .to-display-span { } */
+
+/* VISUAL REFRESH START
+   Remove this block to revert the visual theme while keeping functionality. */
+:root {
+    --page-bg: #efe6d3;
+    --ink: #2d251c;
+    --muted-ink: #746653;
+    --paper: #fffaf0;
+    --paper-deep: #f5ead3;
+    --line: #d7c6a8;
+    --green: #4f7d5a;
+    --green-dark: #3f6548;
+    --blue: #4f718f;
+    --blue-dark: #3d5a73;
+    --red: #a4473f;
+    --red-dark: #843830;
+    --amber-bg: #fff1bf;
+    --amber-line: #d49a28;
+    --amber-text: #6b4610;
+}
+
+body {
+    font-family: "Trebuchet MS", Verdana, sans-serif;
+    background:
+        radial-gradient(circle at top left, rgba(255, 255, 255, 0.65), transparent 30%),
+        linear-gradient(135deg, #f7f0e3 0%, var(--page-bg) 55%, #e5d4b9 100%);
+    color: var(--ink);
+}
+
+h1 {
+    color: var(--ink);
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: clamp(2rem, 5vw, 3.4rem);
+    letter-spacing: -0.03em;
+    margin: 2px 0 4px;
+}
+
+.container {
+    background-color: rgba(255, 250, 240, 0.82);
+    border: 1px solid rgba(104, 82, 48, 0.18);
+    border-radius: 20px;
+    box-shadow: 0 24px 70px rgba(82, 61, 32, 0.22);
+    max-width: 940px;
+}
+
+.app-header {
+    text-align: center;
+}
+
+.eyebrow {
+    color: var(--green-dark);
+    font-size: 0.8rem;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    margin: 0;
+    text-transform: uppercase;
+}
+
+.receipt-count {
+    color: var(--muted-ink);
+    font-weight: 700;
+    margin: 0;
+}
+
+.global-controls {
+    align-items: center;
+    background: linear-gradient(135deg, rgba(255, 250, 240, 0.96), rgba(245, 234, 211, 0.96));
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 12px 28px rgba(82, 61, 32, 0.12);
+    padding: 14px;
+}
+
+.global-controls-label {
+    color: var(--muted-ink);
+    flex: 1 0 100%;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.entry {
+    background:
+        linear-gradient(90deg, rgba(79, 125, 90, 0.08), transparent 12px),
+        var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: 0 14px 32px rgba(82, 61, 32, 0.16);
+    color: var(--ink);
+    padding: 20px;
+}
+
+.entry.entry-has-warning {
+    border-color: var(--amber-line);
+    box-shadow: 0 14px 32px rgba(82, 61, 32, 0.16), 0 0 0 3px rgba(212, 154, 40, 0.18);
+}
+
+.entry input[type="text"],
+.entry input[type="number"] {
+    background-color: #fffdf7;
+    border: 1px solid var(--line);
+    color: var(--ink);
+    font-size: 1rem;
+}
+
+.entry input::placeholder {
+    color: #9a8a72;
+}
+
+.periodo-container {
+    background-color: var(--paper-deep);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 12px;
+}
+
+.period-label,
+.period-separator {
+    color: var(--muted-ink);
+}
+
+.receipt-period-summary .date-display-span {
+    background-color: #fffdf7;
+    border-color: var(--line);
+    color: var(--ink);
+    font-weight: 800;
+}
+
+.entry button,
+#add-entry-top-btn,
+#add-entry-btn,
+#prev-all-month-btn,
+#next-all-month-btn,
+#print-receipts-btn {
+    border-radius: 999px;
+    box-shadow: 0 6px 14px rgba(82, 61, 32, 0.14);
+    font-weight: 800;
+}
+
+#add-entry-top-btn,
+#add-entry-btn {
+    background-color: var(--green);
+}
+
+#add-entry-top-btn:hover,
+#add-entry-btn:hover {
+    background-color: var(--green-dark);
+}
+
+.entry .prev-month-btn,
+.entry .next-month-btn,
+.entry .edit-date-btn,
+.global-month-btn {
+    background-color: var(--blue);
+}
+
+.entry .prev-month-btn:hover,
+.entry .next-month-btn:hover,
+.entry .edit-date-btn:hover,
+.global-month-btn:hover {
+    background-color: var(--blue-dark);
+}
+
+.entry .remove-entry-btn {
+    background-color: var(--red);
+}
+
+.entry .remove-entry-btn:hover {
+    background-color: var(--red-dark);
+}
+
+#print-receipts-btn {
+    background-color: #4f7f7b;
+}
+
+#print-receipts-btn:hover {
+    background-color: #3d6461;
+}
+
+.entry-actions {
+    align-items: center;
+    border-top: 1px dashed var(--line);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: flex-start;
+    margin-top: 10px;
+    padding-top: 14px;
+}
+
+.entry .prev-month-btn {
+    margin-top: 0;
+}
+
+.entry .remove-entry-btn {
+    margin-left: auto;
+}
+
+.entry-warning {
+    background-color: var(--amber-bg);
+    border-color: var(--amber-line);
+    color: var(--amber-text);
+}
+
+#add-entry-btn,
+#print-receipts-btn {
+    margin-top: 10px;
+}
+
+@media (max-width: 640px) {
+    body {
+        padding: 10px;
+    }
+
+    .container {
+        padding: 16px;
+    }
+
+    .global-controls {
+        margin-bottom: 50px;
+    }
+
+    .entry .remove-entry-btn {
+        margin-left: 0;
+    }
+}
+/* VISUAL REFRESH END */

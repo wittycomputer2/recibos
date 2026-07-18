@@ -8,7 +8,19 @@
 </head>
 <body>
     <div class="container">
-        <h1>Generador de Recibos</h1>
+        <div class="app-header">
+            <p class="eyebrow">Recibos de alquiler</p>
+            <h1>Generador de Recibos</h1>
+            <p id="receipt-count" class="receipt-count">0 recibos</p>
+        </div>
+
+        <!-- VISUAL REFRESH: quick actions toolbar. Remove this block to revert the top toolbar copy/layout. -->
+        <div class="global-controls">
+            <span class="global-controls-label">Acciones rápidas</span>
+            <button id="add-entry-top-btn">Agregar Nueva Entrada</button>
+            <button id="prev-all-month-btn" class="global-month-btn left-arrow-btn">← Atrasar todos los recibos 1 mes</button>
+            <button id="next-all-month-btn" class="global-month-btn right-arrow-btn">Adelantar todos los recibos 1 mes →</button>
+        </div>
 
         <div id="entries-container">
             <!-- Entry template (will be cloned by JavaScript) -->
@@ -17,20 +29,21 @@
                 <input type="text" class="entry-inquilino" placeholder="Inquilino">
                 <input type="number" class="entry-monto" placeholder="Monto de la Renta">
                 <div class="periodo-container">
-                    <div class="date-field-group">
-                        <label>Desde:</label>
-                        <input type="date" class="entry-periodo-from">
+                    <div class="receipt-period-summary">
+                        <span class="period-label">Periodo del recibo:</span>
                         <span class="date-display-span from-display-span"></span>
-                    </div>
-                    <div class="date-field-group">
-                        <label>Hasta:</label> <!-- Removed inline style="margin-left: 10px;" as spacing will be handled by .periodo-container's gap -->
-                        <input type="date" class="entry-periodo-to">
+                        <span class="period-separator">al</span>
                         <span class="date-display-span to-display-span"></span>
                     </div>
+                    <input type="date" class="entry-periodo-from receipt-date-input" aria-label="Fecha inicial del recibo">
+                    <button type="button" class="edit-date-btn">Editar Fecha de Recibo</button>
                 </div>
-                <button class="prev-month-btn">Mes Previo</button>
-                <button class="next-month-btn">Próximo Mes</button>
-                <button class="remove-entry-btn">Eliminar</button>
+                <div class="entry-warning" aria-live="polite"></div>
+                <div class="entry-actions">
+                    <button class="prev-month-btn">Mes Previo</button>
+                    <button class="next-month-btn">Próximo Mes</button>
+                    <button class="remove-entry-btn">Eliminar</button>
+                </div>
             </div>
         </div>
 

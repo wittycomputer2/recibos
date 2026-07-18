@@ -1,7 +1,11 @@
 document.addEventListener('DOMContentLoaded', () => {
     const entriesContainer = document.getElementById('entries-container');
+    const addEntryTopBtn = document.getElementById('add-entry-top-btn');
     const addEntryBtn = document.getElementById('add-entry-btn');
+    const prevAllMonthBtn = document.getElementById('prev-all-month-btn');
+    const nextAllMonthBtn = document.getElementById('next-all-month-btn');
     const printReceiptsBtn = document.getElementById('print-receipts-btn');
+    const receiptCount = document.getElementById('receipt-count');
     const entryTemplate = document.getElementById('entry-template');
     const { jsPDF } = window.jspdf;
 
@@ -46,14 +50,111 @@ document.addEventListener('DOMContentLoaded', () => {
     function formatDate(dateString) {
         if (!dateString) return 'Fecha no especificada';
         // Ensure date is treated as local by splitting and creating new Date
-    const parts = dateString.split('-'); // Expects YYYY-MM-DD
-    const date = new Date(parts[0], parts[1] - 1, parts[2]); // Month is 0-indexed
+        const parts = dateString.split('-'); // Expects YYYY-MM-DD
+        const date = new Date(parts[0], parts[1] - 1, parts[2]); // Month is 0-indexed
 
-    const day = date.getDate().toString().padStart(2, '0');
-    const month = getSpanishMonth(date.getMonth());
-    const year = date.getFullYear();
+        const day = date.getDate().toString().padStart(2, '0');
+        const month = getSpanishMonth(date.getMonth());
+        const year = date.getFullYear();
 
-    return `${day} de ${month} de ${year}`;
+        return `${day} de ${month} de ${year}`;
+    }
+
+    function parseInputDate(dateString) {
+        if (!dateString) return null;
+        const parts = dateString.split('-');
+        if (parts.length !== 3) return null;
+        return new Date(parts[0], parts[1] - 1, parts[2]);
+    }
+
+    function formatDateForInput(date) {
+        const year = date.getFullYear();
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const day = date.getDate().toString().padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    function calculateReceiptEndDate(fromDate) {
+        const nextMonthYear = fromDate.getFullYear() + Math.floor((fromDate.getMonth() + 1) / 12);
+        const nextMonth = (fromDate.getMonth() + 1) % 12;
+        const daysInNextMonth = new Date(nextMonthYear, nextMonth + 1, 0).getDate();
+        const nextPeriodStart = new Date(nextMonthYear, nextMonth, Math.min(fromDate.getDate(), daysInNextMonth));
+        nextPeriodStart.setDate(nextPeriodStart.getDate() - 1);
+        return nextPeriodStart;
+    }
+
+    function syncReceiptPeriod(entryId) {
+        const entryIndex = entriesData.findIndex(e => e.id === entryId);
+        if (entryIndex === -1) return;
+
+        const entryData = entriesData[entryIndex];
+        const entryDiv = document.getElementById(entryId);
+        if (!entryDiv) return;
+
+        const periodoFromInput = entryDiv.querySelector('.entry-periodo-from');
+        const fromDate = parseInputDate(periodoFromInput.value);
+        if (!fromDate) return;
+
+        const periodoTo = formatDateForInput(calculateReceiptEndDate(fromDate));
+        const fromDisplaySpan = entryDiv.querySelector('.from-display-span');
+        const toDisplaySpan = entryDiv.querySelector('.to-display-span');
+
+        entryData.periodoFrom = periodoFromInput.value;
+        entryData.periodoTo = periodoTo;
+
+        if (fromDisplaySpan) fromDisplaySpan.textContent = formatDateForDisplay(entryData.periodoFrom);
+        if (toDisplaySpan) toDisplaySpan.textContent = formatDateForDisplay(entryData.periodoTo);
+    }
+
+    function getEntryWarnings(entryData) {
+        const warnings = [];
+
+        if (!entryData.inquilino || !entryData.inquilino.trim()) {
+            warnings.push('Falta inquilino');
+        }
+
+        if (!entryData.monto || Number(entryData.monto) <= 0) {
+            warnings.push('Falta monto');
+        }
+
+        if (!entryData.periodoFrom) {
+            warnings.push('Falta fecha de recibo');
+        }
+
+        return warnings;
+    }
+
+    function updateEntryWarnings(entryId) {
+        const entryData = entriesData.find(e => e.id === entryId);
+        const entryDiv = document.getElementById(entryId);
+        if (!entryData || !entryDiv) return;
+
+        const warningDiv = entryDiv.querySelector('.entry-warning');
+        if (!warningDiv) return;
+
+        const warnings = getEntryWarnings(entryData);
+        warningDiv.textContent = warnings.join(' · ');
+        warningDiv.style.display = warnings.length ? 'block' : 'none';
+        entryDiv.classList.toggle('entry-has-warning', warnings.length > 0);
+    }
+
+    function updateAllEntryWarnings() {
+        entriesData.forEach(entryData => updateEntryWarnings(entryData.id));
+    }
+
+    // VISUAL REFRESH: header count. Remove this function and its calls to revert.
+    function updateReceiptCount() {
+        const total = entriesData.length;
+        const ready = entriesData.filter(entryData => getEntryWarnings(entryData).length === 0 && entryData.periodoTo).length;
+        const incomplete = total - ready;
+
+        if (total === 0) {
+            receiptCount.textContent = '0 recibos';
+        } else if (incomplete === 0) {
+            receiptCount.textContent = `${ready} recibo${ready === 1 ? '' : 's'} listo${ready === 1 ? '' : 's'}`;
+        } else {
+            receiptCount.textContent = `${ready} listo${ready === 1 ? '' : 's'} · ${incomplete} con datos faltantes`;
+        }
     }
 
     function saveEntries() {
@@ -73,13 +174,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateAddEntryButtonState() {
+        const addButtons = [addEntryTopBtn, addEntryBtn];
+
         if (entriesData.length >= MAX_ENTRIES) {
-            addEntryBtn.disabled = true;
-            addEntryBtn.textContent = 'Límite de entradas alcanzado';
+            addButtons.forEach(button => {
+                button.disabled = true;
+                button.textContent = 'Límite de entradas alcanzado';
+            });
         } else {
-            addEntryBtn.disabled = false;
-            addEntryBtn.textContent = 'Agregar Nueva Entrada';
+            addButtons.forEach(button => {
+                button.disabled = false;
+                button.textContent = 'Agregar Nueva Entrada';
+            });
         }
+        updateReceiptCount();
     }
 
     function renderEntry(data) {
@@ -97,32 +205,30 @@ document.addEventListener('DOMContentLoaded', () => {
         const inquilinoInput = newEntryDiv.querySelector('.entry-inquilino');
         const montoInput = newEntryDiv.querySelector('.entry-monto');
         const periodoFromInput = newEntryDiv.querySelector('.entry-periodo-from');
-        const periodoToInput = newEntryDiv.querySelector('.entry-periodo-to');
         const fromDisplaySpan = newEntryDiv.querySelector('.from-display-span');
         const toDisplaySpan = newEntryDiv.querySelector('.to-display-span');
         const removeBtn = newEntryDiv.querySelector('.remove-entry-btn');
         const prevMonthBtn = newEntryDiv.querySelector('.prev-month-btn');
         const nextMonthBtn = newEntryDiv.querySelector('.next-month-btn');
+        const editDateBtn = newEntryDiv.querySelector('.edit-date-btn');
 
         if (data) {
             deptoInput.value = data.depto || '';
             inquilinoInput.value = data.inquilino || '';
             montoInput.value = data.monto || '';
             periodoFromInput.value = data.periodoFrom || '';
-            periodoToInput.value = data.periodoTo || '';
-            // Update display spans for loaded data
+            const fromDate = parseInputDate(periodoFromInput.value);
+            data.periodoTo = fromDate ? formatDateForInput(calculateReceiptEndDate(fromDate)) : '';
             if(data.periodoFrom) fromDisplaySpan.textContent = formatDateForDisplay(data.periodoFrom);
             if(data.periodoTo) toDisplaySpan.textContent = formatDateForDisplay(data.periodoTo);
         } else {
             // Set default dates for new entries if no data provided
             const today = new Date();
             const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-            const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
             periodoFromInput.valueAsDate = firstDayOfMonth;
-            periodoToInput.valueAsDate = lastDayOfMonth;
-            // Update display spans for default new entry dates
+            const periodoTo = formatDateForInput(calculateReceiptEndDate(firstDayOfMonth));
             fromDisplaySpan.textContent = formatDateForDisplay(periodoFromInput.value);
-            toDisplaySpan.textContent = formatDateForDisplay(periodoToInput.value);
+            toDisplaySpan.textContent = formatDateForDisplay(periodoTo);
         }
 
         // Event Listeners
@@ -130,29 +236,48 @@ document.addEventListener('DOMContentLoaded', () => {
             newEntryDiv.remove();
             entriesData = entriesData.filter(e => e.id !== entryId);
             saveEntries();
+            updateReceiptCount();
             updateAddEntryButtonState();
         });
 
         prevMonthBtn.addEventListener('click', () => shiftMonth(entryId, -1));
         nextMonthBtn.addEventListener('click', () => shiftMonth(entryId, 1));
+        editDateBtn.addEventListener('click', () => {
+            try {
+                if (typeof periodoFromInput.showPicker === 'function') {
+                    periodoFromInput.showPicker();
+                    return;
+                }
+            } catch (error) {
+                // Some browsers block showPicker() on visually hidden inputs.
+            }
+            periodoFromInput.style.opacity = '1';
+            periodoFromInput.style.pointerEvents = 'auto';
+            periodoFromInput.style.width = 'auto';
+            periodoFromInput.style.height = 'auto';
+            periodoFromInput.addEventListener('blur', () => {
+                periodoFromInput.removeAttribute('style');
+            }, { once: true });
+            periodoFromInput.focus();
+            if (typeof periodoFromInput.click === 'function') {
+                periodoFromInput.focus();
+                periodoFromInput.click();
+            }
+        });
 
-        [deptoInput, inquilinoInput, montoInput, periodoFromInput, periodoToInput].forEach(input => {
+        [deptoInput, inquilinoInput, montoInput, periodoFromInput].forEach(input => {
             input.addEventListener('input', () => {
                 const entryIndex = entriesData.findIndex(e => e.id === entryId);
                 if (entryIndex > -1) {
                     entriesData[entryIndex][input.classList.contains('entry-depto') ? 'depto' :
                                         input.classList.contains('entry-inquilino') ? 'inquilino' :
                                         input.classList.contains('entry-monto') ? 'monto' :
-                                        input.classList.contains('entry-periodo-from') ? 'periodoFrom' : 'periodoTo'] = input.value;
+                                        'periodoFrom'] = input.value;
                     if (input.type === 'date') {
-                        const displaySpan = input.classList.contains('entry-periodo-from') ?
-                                            fromDisplaySpan : // Use already queried span
-                                            toDisplaySpan;   // Use already queried span
-                        if (displaySpan) {
-                            displaySpan.textContent = formatDateForDisplay(input.value);
-                        }
-                        validatePeriod(entryId);
+                        syncReceiptPeriod(entryId);
                     }
+                    updateEntryWarnings(entryId);
+                    updateReceiptCount();
                     saveEntries();
                 }
             });
@@ -166,11 +291,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 inquilino: inquilinoInput.value,
                 monto: montoInput.value,
                 periodoFrom: periodoFromInput.value,
-                periodoTo: periodoToInput.value,
+                periodoTo: formatDateForInput(calculateReceiptEndDate(parseInputDate(periodoFromInput.value))),
             });
             saveEntries();
         }
-        validatePeriod(entryId); // Initial validation for loaded or new entries
+        syncReceiptPeriod(entryId); // Initial calculation for loaded or new entries
+        if (data) saveEntries();
+        updateEntryWarnings(entryId);
+        updateReceiptCount();
         updateAddEntryButtonState();
     }
 
@@ -185,104 +313,31 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    function validatePeriod(entryId) {
-        const entryIndex = entriesData.findIndex(e => e.id === entryId);
-        if (entryIndex === -1) return;
-
-        const entryData = entriesData[entryIndex];
+    function shiftMonth(entryId, monthOffset) {
         const entryDiv = document.getElementById(entryId);
         if (!entryDiv) return;
 
         const periodoFromInput = entryDiv.querySelector('.entry-periodo-from');
-        const periodoToInput = entryDiv.querySelector('.entry-periodo-to');
+        const currentFromDate = parseInputDate(periodoFromInput.value) || new Date();
+        const originalDay = currentFromDate.getDate();
+        let newYear = currentFromDate.getFullYear();
+        let newMonth = currentFromDate.getMonth() + monthOffset;
 
-        if (periodoFromInput.value && periodoToInput.value) {
-            const fromDate = new Date(periodoFromInput.value + 'T00:00:00');
-            let toDate = new Date(periodoToInput.value + 'T00:00:00');
+        newYear += Math.floor(newMonth / 12);
+        newMonth = (newMonth % 12 + 12) % 12;
 
-            const diffTime = Math.abs(toDate - fromDate);
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // Include start day
+        const daysInNewMonth = new Date(newYear, newMonth + 1, 0).getDate();
+        const newFromDate = new Date(newYear, newMonth, Math.min(originalDay, daysInNewMonth));
 
-            if (diffDays > 31) {
-                const newToDate = new Date(fromDate);
-                newToDate.setDate(newToDate.getDate() + 30);
-                periodoToInput.valueAsDate = newToDate; // Update DOM
-                entryData.periodoTo = periodoToInput.value; // Update data
-                saveEntries();
-            } else if (toDate < fromDate) { // Ensure ToDate is not before FromDate
-                 periodoToInput.valueAsDate = fromDate;
-                 entryData.periodoTo = periodoToInput.value;
-                 saveEntries();
-            }
-        }
+        periodoFromInput.value = formatDateForInput(newFromDate);
+        syncReceiptPeriod(entryId);
+        updateEntryWarnings(entryId);
+        saveEntries();
     }
 
-    function shiftMonth(entryId, monthOffset) {
-    const entryIndex = entriesData.findIndex(e => e.id === entryId);
-    if (entryIndex === -1) return;
-
-    const entryData = entriesData[entryIndex];
-    const entryDiv = document.getElementById(entryId);
-    if (!entryDiv) return;
-
-    const periodoFromInput = entryDiv.querySelector('.entry-periodo-from');
-    const periodoToInput = entryDiv.querySelector('.entry-periodo-to');
-
-    // Get current "Desde" date
-    let currentFromDate;
-    if (periodoFromInput.value) {
-        const parts = periodoFromInput.value.split('-');
-        currentFromDate = new Date(parts[0], parts[1] - 1, parts[2]);
-    } else {
-        currentFromDate = new Date();
-        currentFromDate.setHours(0, 0, 0, 0);
-        currentFromDate.setDate(1);
+    function shiftAllMonths(monthOffset) {
+        entriesData.forEach(entryData => shiftMonth(entryData.id, monthOffset));
     }
-
-    // Store the original day
-    const originalDay = currentFromDate.getDate();
-
-    // Calculate new year and month
-    let newYear = currentFromDate.getFullYear();
-    let newMonth = currentFromDate.getMonth() + monthOffset;
-    
-    // Adjust year if month goes out of bounds
-    newYear += Math.floor(newMonth / 12);
-    newMonth = (newMonth % 12 + 12) % 12; // Ensure positive month (0-11)
-
-    // Create new "Desde" date - this approach avoids Date's month overflow issues
-    let newFromDate = new Date(newYear, newMonth, 1);
-    const daysInNewMonth = new Date(newYear, newMonth + 1, 0).getDate();
-    newFromDate.setDate(Math.min(originalDay, daysInNewMonth));
-
-    // Calculate new "Hasta" date - exactly one month after newFromDate, minus one day
-    let newToDate = new Date(newFromDate);
-    newToDate.setMonth(newToDate.getMonth() + 1);
-    newToDate.setDate(newToDate.getDate() - 1);
-
-    // Format dates as YYYY-MM-DD
-    const formatDateForInput = (date) => {
-        const year = date.getFullYear();
-        const month = (date.getMonth() + 1).toString().padStart(2, '0');
-        const day = date.getDate().toString().padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    };
-
-    // Update DOM and data store
-    periodoFromInput.value = formatDateForInput(newFromDate);
-    periodoToInput.value = formatDateForInput(newToDate);
-
-    // Update display spans
-    const fromDisplaySpan = entryDiv.querySelector('.from-display-span');
-    const toDisplaySpan = entryDiv.querySelector('.to-display-span');
-    if (fromDisplaySpan) fromDisplaySpan.textContent = formatDateForDisplay(periodoFromInput.value);
-    if (toDisplaySpan) toDisplaySpan.textContent = formatDateForDisplay(periodoToInput.value);
-
-    entryData.periodoFrom = periodoFromInput.value;
-    entryData.periodoTo = periodoToInput.value;
-
-    saveEntries();
-}
 
     // Enhanced function to generate receipt number
     function generateReceiptNumber() {
@@ -339,157 +394,177 @@ document.addEventListener('DOMContentLoaded', () => {
         return result.trim();
     }
 
-    function printReceipts() {
-    const validEntries = entriesData.filter(e => e.inquilino && e.monto && e.periodoFrom && e.periodoTo);
-
-    if (validEntries.length === 0) {
-        alert('No hay entradas válidas para imprimir. Asegúrese de que Inquilino, Monto y Períodos estén completos.');
-        return;
-    }
-
-    const doc = new jsPDF({ unit: 'mm', format: 'letter' });
-    const pageHeight = doc.internal.pageSize.height;
-    const pageWidth = doc.internal.pageSize.width;
-    const margin = 12;
-    const receiptWidth = pageWidth - (margin * 2);
-    const receiptHeight = 90;
-    let currentY = margin;
-    let receiptsOnPage = 0;
-
-    validEntries.forEach((entry, index) => {
-        if (receiptsOnPage > 0 && currentY + receiptHeight > pageHeight - margin) {
-            doc.addPage();
-            currentY = margin;
-            receiptsOnPage = 0;
-        }
-
-        const receiptNumber = generateReceiptNumber();
-        const currentDate = new Date().toLocaleDateString('es-ES', {
-            day: '2-digit',
-            month: 'long',
-            year: 'numeric'
-        });
-
-        const receiptTop = currentY;
-        const receiptBottom = currentY + receiptHeight;
-
-        // === Main Border ===
-        doc.setDrawColor(51, 51, 51);
-        doc.setLineWidth(1.2);
-        doc.rect(margin, receiptTop, receiptWidth, receiptHeight);
-
-        // === Decorative Header Strip ===
-        doc.setFillColor(240, 248, 255);
-        doc.setDrawColor(240, 248, 255);
-        doc.rect(margin, receiptTop, receiptWidth, 20, 'F');
-
-        // === Decorative Corners ===
-        doc.setFillColor(70, 130, 180);
-        doc.circle(margin + 5, receiptTop + 5, 2, 'F');
-        doc.circle(margin + receiptWidth - 5, receiptTop + 5, 2, 'F');
-        doc.circle(margin + 5, receiptBottom - 5, 2, 'F');
-        doc.circle(margin + receiptWidth - 5, receiptBottom - 5, 2, 'F');
-
-        // === Content Layout ===
-        let contentY = receiptTop + 8;
-
-        // Title
-        doc.setTextColor(25, 25, 112);
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(18);
-        doc.text('RECIBO DE PAGO', pageWidth / 2, contentY, { align: 'center' });
-
-        // Receipt number
-        doc.setFontSize(10);
-        doc.setTextColor(100, 100, 100);
-        doc.text(`No. ${receiptNumber}`, margin + receiptWidth - 5, contentY + 5, { align: 'right' });
-
-        contentY += 18;
-
-        // Fecha + Recibí de
-        doc.setTextColor(51, 51, 51);
-        doc.setFont("times", "bold");
-        doc.setFontSize(11);
-        doc.text('Fecha:', margin + 8, contentY);
-        doc.setFont("times", "normal");
-        doc.text(currentDate, margin + 25, contentY);
-
-        doc.setFont("times", "bold");
-        doc.text('Recibí de:', margin + receiptWidth / 2, contentY);
-        doc.setFont("times", "normal");
-        doc.setFontSize(12);
-        doc.text(`${entry.inquilino || 'N/A'}`, margin + receiptWidth / 2 + 25, contentY);
-
-        contentY += 6;
-
-        // === Top separator line (NOW moved BELOW header info) ===
-        doc.setDrawColor(70, 130, 180);
-        doc.setLineWidth(0.5);
-        doc.line(margin + 8, contentY, margin + receiptWidth - 8, contentY);
-
-        contentY += 6;
-
-        // Amount
+    /* PDF STYLE REFRESH START
+       Revert this block to restore the previous PDF appearance. Keeps 3 receipts per letter page. */
+    function drawOfficialReceipt(doc, entry, receiptNumber, currentDate, box) {
+        const { x, y, width, height } = box;
+        const padding = 7;
+        const right = x + width;
+        const bottom = y + height;
+        const innerX = x + padding;
+        const innerRight = right - padding;
+        const innerWidth = width - (padding * 2);
         const amount = parseFloat(entry.monto || 0);
         const amountStr = `$ ${amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN`;
         const amountInWords = numberToWords(Math.floor(amount));
         const cents = amount % 1 !== 0 ? Math.round((amount % 1) * 100).toString().padStart(2, '0') : '00';
-        const amountWordsStr = `(${amountInWords} pesos ${cents}/100 M.N.)`;
-
-        doc.setFont("times", "bold");
-        doc.setFontSize(11);
-        doc.setTextColor(51, 51, 51);
-        doc.text('La cantidad de:', margin + 8, contentY);
-
-        doc.setFont("times", "bold");
-        doc.setFontSize(14);
-        doc.setTextColor(25, 25, 112);
-        doc.text(amountStr, margin + 45, contentY);
-
-        contentY += 6;
-
-        doc.setFont("times", "italic");
-        doc.setFontSize(9);
-        doc.setTextColor(100, 100, 100);
-        doc.text(amountWordsStr, margin + 8, contentY, { maxWidth: receiptWidth - 16 });
-
-        contentY += 14;
-
-        // Concept line (wrapped as requested)
-        doc.setFont("times", "bold");
-        doc.setFontSize(11);
-        doc.setTextColor(51, 51, 51);
-        doc.text('Por concepto de', margin + 8, contentY);
-        contentY += 6;
-
+        const amountWordsStr = `${amountInWords} pesos ${cents}/100 M.N.`;
         const desde = formatDate(entry.periodoFrom);
         const hasta = formatDate(entry.periodoTo);
-        doc.text(`renta desde ${desde} hasta ${hasta}`, margin + 8, contentY);
+        const concept = `Renta del periodo de ${desde} al ${hasta}.`;
+        const depto = entry.depto ? `Depto: ${entry.depto}` : '';
 
-        contentY += 18;
+        doc.setFillColor(255, 252, 245);
+        doc.roundedRect(x, y, width, height, 2.8, 2.8, 'F');
 
-        // Signature line
-        doc.setFont("times", "bold");
+        doc.setDrawColor(45, 55, 72);
+        doc.setLineWidth(0.75);
+        doc.roundedRect(x, y, width, height, 2.8, 2.8);
+
+        doc.setDrawColor(191, 163, 104);
+        doc.setLineWidth(0.28);
+        doc.roundedRect(x + 2.2, y + 2.2, width - 4.4, height - 4.4, 1.8, 1.8);
+
+        doc.setFillColor(31, 54, 79);
+        doc.roundedRect(x, y, width, 14, 2.8, 2.8, 'F');
+        doc.setFillColor(31, 54, 79);
+        doc.rect(x, y + 7, width, 7, 'F');
+
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text('Recibo de Dinero', x + width / 2, y + 9.5, { align: 'center' });
+
+        doc.setFillColor(191, 163, 104);
+        doc.rect(x, y + 14, width, 1.2, 'F');
+
+        doc.setTextColor(55, 55, 55);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8.5);
+        doc.text(`Folio: ${receiptNumber}`, innerX, y + 22);
+        doc.text(`Fecha: ${currentDate}`, innerRight, y + 22, { align: 'right' });
+
+        doc.setDrawColor(216, 202, 171);
+        doc.setLineWidth(0.25);
+        doc.line(innerX, y + 25, innerRight, y + 25);
+
+        doc.setFont('times', 'bold');
+        doc.setTextColor(31, 54, 79);
         doc.setFontSize(10);
-        doc.setTextColor(51, 51, 51);
-        doc.text('Firma:', margin + receiptWidth - 80, receiptBottom - 14);
+        doc.text('Recibí de:', innerX, y + 32);
+
+        doc.setFont('times', 'normal');
+        doc.setTextColor(35, 35, 35);
+        doc.setFontSize(12);
+        doc.text(entry.inquilino || 'N/A', innerX + 24, y + 32, { maxWidth: innerWidth - 62 });
+
+        if (depto) {
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(88, 78, 59);
+            doc.setFontSize(8.5);
+            doc.text(depto, innerRight, y + 32, { align: 'right' });
+        }
+
+        doc.setFillColor(244, 237, 221);
+        doc.roundedRect(innerX, y + 37, innerWidth, 14, 1.8, 1.8, 'F');
+        doc.setDrawColor(216, 202, 171);
+        doc.roundedRect(innerX, y + 37, innerWidth, 14, 1.8, 1.8);
+
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(88, 78, 59);
+        doc.setFontSize(8);
+        doc.text('LA CANTIDAD DE', innerX + 4, y + 42.5);
+
+        doc.setFont('times', 'bold');
+        doc.setTextColor(31, 54, 79);
+        doc.setFontSize(14);
+        doc.text(amountStr, innerRight - 4, y + 46.3, { align: 'right' });
+
+        doc.setFont('times', 'italic');
+        doc.setTextColor(88, 88, 88);
+        doc.setFontSize(8.2);
+        doc.text(`(${amountWordsStr})`, innerX + 4, y + 49.2, { maxWidth: innerWidth - 8 });
+
+        doc.setFont('times', 'bold');
+        doc.setTextColor(31, 54, 79);
+        doc.setFontSize(9.5);
+        doc.text('Por concepto de:', innerX, y + 58);
+
+        doc.setFont('times', 'normal');
+        doc.setTextColor(35, 35, 35);
+        doc.setFontSize(9.2);
+        doc.text(doc.splitTextToSize(concept, innerWidth - 38), innerX + 34, y + 58);
 
         doc.setDrawColor(150, 150, 150);
-        doc.setLineWidth(0.8);
-        doc.line(margin + receiptWidth - 65, receiptBottom - 11, margin + receiptWidth - 8, receiptBottom - 11);
+        doc.setLineWidth(0.45);
+        doc.line(right - 72, bottom - 13, right - 12, bottom - 13);
 
-        currentY += receiptHeight + 8;
-        receiptsOnPage++;
-    });
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(55, 55, 55);
+        doc.setFontSize(8.5);
+        doc.text('Firma de recibido', right - 42, bottom - 8.5, { align: 'center' });
 
-    doc.save('recibos_oficiales_alquiler.pdf');
-}
+        doc.setDrawColor(191, 163, 104);
+        doc.setLineWidth(0.2);
+        doc.line(innerX, bottom - 6, innerRight, bottom - 6);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(120, 120, 120);
+        doc.setFontSize(6.5);
+        doc.text('Recibo de Dinero', innerX, bottom - 2.8);
+    }
+    /* PDF STYLE REFRESH END */
+
+    function printReceipts() {
+        updateAllEntryWarnings();
+        updateReceiptCount();
+        const validEntries = entriesData.filter(e => getEntryWarnings(e).length === 0 && e.periodoTo);
+
+        if (validEntries.length === 0) {
+            alert('No hay entradas válidas para imprimir. Revise los avisos amarillos en cada recibo.');
+            return;
+        }
+
+        const doc = new jsPDF({ unit: 'mm', format: 'letter' });
+        const pageHeight = doc.internal.pageSize.height;
+        const pageWidth = doc.internal.pageSize.width;
+        const margin = 10;
+        const gap = 5;
+        const receiptWidth = pageWidth - (margin * 2);
+        const receiptHeight = (pageHeight - (margin * 2) - (gap * 2)) / 3;
+
+        validEntries.forEach((entry, index) => {
+            if (index > 0 && index % 3 === 0) {
+                doc.addPage();
+            }
+
+            const positionOnPage = index % 3;
+            const receiptNumber = generateReceiptNumber();
+            const currentDate = new Date().toLocaleDateString('es-ES', {
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric'
+            });
+
+            drawOfficialReceipt(doc, entry, receiptNumber, currentDate, {
+                x: margin,
+                y: margin + positionOnPage * (receiptHeight + gap),
+                width: receiptWidth,
+                height: receiptHeight,
+            });
+        });
+
+        doc.save('recibos_oficiales_alquiler.pdf');
+    }
 
 
 
 
 
+    addEntryTopBtn.addEventListener('click', () => addEntry());
     addEntryBtn.addEventListener('click', () => addEntry()); // Pass no data for new blank entry
+    prevAllMonthBtn.addEventListener('click', () => shiftAllMonths(-1));
+    nextAllMonthBtn.addEventListener('click', () => shiftAllMonths(1));
     printReceiptsBtn.addEventListener('click', printReceipts);
 
     loadEntries(); // Load entries from localStorage on page load
